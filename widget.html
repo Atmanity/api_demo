@@ -1,0 +1,287 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Grand Valley Hotel — Atmee widget demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  :root {
+    --ink: #1e2b26; --muted: #55605c; --paper: #f8f7f3; --card: #fff;
+    --line: #e6e4de; --pine: #1f3a34; --brand: #6d4cf2; --brand-dark: #5b3ee0;
+  }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 Inter, system-ui, sans-serif; }
+  .serif { font-family: "Cormorant Garamond", Georgia, serif; }
+
+  /* ---------- Demo banner ---------- */
+  .banner {
+    background: var(--brand); color: #fff; font-size: 14px; font-weight: 600;
+    display: flex; justify-content: center; align-items: center; gap: 14px; padding: 12px 20px;
+  }
+  .banner a { color: var(--brand); background: #fff; text-decoration: none; padding: 6px 14px; border-radius: 999px; font-size: 13px; }
+
+  /* ---------- Site ---------- */
+  .wrap { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 36px 0; }
+  .logo { font-size: 28px; font-weight: 500; }
+  nav { display: flex; align-items: center; gap: 26px; font-size: 15px; }
+  nav a { color: var(--ink); text-decoration: none; }
+  .btn-dark { background: var(--pine); color: #fff; border: 0; border-radius: 8px; padding: 12px 20px; font: 600 15px Inter, sans-serif; cursor: pointer; }
+
+  .hero { display: grid; grid-template-columns: 1.15fr 1fr; gap: 48px; align-items: center; padding: 40px 0 56px; }
+  .hero h1 { font-size: 64px; line-height: 1.02; font-weight: 500; margin: 0 0 20px; }
+  .hero p { color: var(--muted); font-size: 17px; max-width: 480px; margin: 0 0 30px; }
+  .hero-img {
+    aspect-ratio: 4/3; border-radius: 12px; position: relative;
+    background: linear-gradient(180deg, #c9d3c9 0%, #94ab99 60%, #6f8f79 100%);
+  }
+  .hero-img span { position: absolute; left: 24px; bottom: 20px; font-style: italic; font-size: 18px; color: var(--pine); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .card h3 { margin: 0 0 8px; font-size: 22px; font-weight: 500; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  .ask { margin: 48px 0 80px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 30px; display: grid; grid-template-columns: 1fr auto; gap: 30px; align-items: center; }
+  .ask h2 { font-size: 30px; font-weight: 500; margin: 0 0 12px; }
+  .ask p { color: var(--muted); margin: 0; max-width: 460px; }
+  .link-btn { background: none; border: 0; color: var(--brand); font: 600 15px Inter, sans-serif; cursor: pointer; padding: 0; margin-top: 16px; }
+
+  /* ---------- Floating avatar widget (the part you'd copy) ---------- */
+  #aw-launcher {
+    position: fixed; right: 28px; bottom: 28px; width: 76px; height: 76px; border-radius: 50%;
+    border: 0; padding: 0; cursor: pointer; overflow: hidden; z-index: 50;
+    background: radial-gradient(circle at 30% 30%, #f0b27a, #c9743a);
+    box-shadow: 0 0 0 5px rgba(109,76,242,.35), 0 10px 30px rgba(0,0,0,.25);
+    transition: transform .15s;
+  }
+  #aw-launcher:hover { transform: scale(1.05); }
+  #aw-launcher .dot { position: absolute; right: 6px; bottom: 6px; width: 14px; height: 14px; border-radius: 50%; background: #22c55e; border: 2px solid #fff; }
+  #aw-launcher svg { width: 100%; height: 100%; display: block; }
+
+  #aw-panel {
+    position: fixed; right: 28px; bottom: 120px; width: 372px; max-width: calc(100vw - 32px);
+    background: #fff; border-radius: 18px; overflow: hidden; z-index: 50;
+    box-shadow: 0 24px 70px rgba(0,0,0,.22), 0 0 0 1px rgba(0,0,0,.06);
+    font-size: 14px; display: none;
+  }
+  #aw-panel.open { display: block; }
+  .aw-head { display: flex; align-items: center; gap: 12px; padding: 16px 16px 14px; }
+  .aw-face { width: 44px; height: 44px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #f0b27a, #c9743a); flex: none; }
+  .aw-name { font-weight: 600; font-size: 15px; }
+  .aw-sub { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .aw-sub::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+  .aw-close { margin-left: auto; border: 0; background: none; font-size: 20px; color: #666; cursor: pointer; }
+
+  .aw-stage { position: relative; aspect-ratio: 372/200; background: linear-gradient(135deg, #d98b52, #b8642f); }
+  .aw-stage video#aw-avatar { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .aw-stage video#aw-self { position: absolute; right: 10px; bottom: 10px; width: 26%; border-radius: 10px; border: 1px solid rgba(255,255,255,.4); display: none; }
+  .aw-pill { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,.6); color: #fff; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; backdrop-filter: blur(4px); }
+  .aw-pill.hearing { background: rgba(16,185,129,.7); }
+
+  .aw-body { padding: 16px; text-align: center; }
+  .aw-cta { width: 100%; border: 0; border-radius: 10px; background: var(--brand); color: #fff; padding: 14px; font: 600 15px Inter, sans-serif; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; }
+  .aw-cta:hover { background: var(--brand-dark); }
+  .aw-cta:disabled { opacity: .7; cursor: default; }
+  .aw-tag { display: inline-block; margin-top: 12px; background: #eeeafd; color: var(--brand); font-weight: 600; font-size: 12px; padding: 4px 12px; border-radius: 999px; }
+  .aw-note { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .aw-controls { display: none; gap: 8px; justify-content: center; }
+  .aw-controls button { flex: 1; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 10px; font: 500 13px Inter, sans-serif; cursor: pointer; }
+  .aw-controls button.off { background: #fee2e2; border-color: #fca5a5; }
+  .aw-controls button.end { background: #1e2b26; color: #fff; border-color: transparent; }
+  .aw-foot { border-top: 1px solid var(--line); padding: 12px; text-align: center; color: var(--muted); font-size: 12px; }
+  #aw-transcript {
+    display: none; flex-direction: column; gap: 5px; max-height: 130px;
+    overflow-y: auto; padding: 10px 12px; border-top: 1px solid var(--line);
+    font-size: 12.5px;
+  }
+  #aw-transcript .line { max-width: 85%; padding: 5px 9px; border-radius: 9px; }
+  #aw-transcript .avatar { align-self: flex-start; background: rgba(127,127,127,.15); }
+  #aw-transcript .user { align-self: flex-end; background: rgba(99,102,241,.25); }
+  #aw-panel.live .aw-idle { display: none; }
+  #aw-panel.live .aw-controls { display: flex; }
+
+  @media (max-width: 860px) {
+    .hero, .cards, .ask { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 44px; }
+    nav a { display: none; }
+  }
+</style>
+
+<div class="banner">
+  Demo preview — how your avatar appears embedded on grandvalley.com
+  <a href="/">Back to the basic demo</a>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="logo serif">Grand Valley <i>Hotel</i></div>
+    <nav><a href="#">Rooms</a><a href="#">Dining</a><a href="#">Spa</a><a href="#">Gatherings</a><button class="btn-dark">Book a stay</button></nav>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1 class="serif">Quiet luxury<br />in the pines</h1>
+      <p>Forty rooms, one long veranda, and the best trout river in the valley. Our doors have been open since 1931.</p>
+      <button class="btn-dark">Check availability</button>
+    </div>
+    <div class="hero-img"><span class="serif">The veranda at dusk</span></div>
+  </section>
+
+  <section class="cards">
+    <div class="card"><h3 class="serif">The Rooms</h3><p>Pine-panelled, river-facing, blissfully phone-free if you ask.</p></div>
+    <div class="card"><h3 class="serif">The Table</h3><p>One seating a night. Whatever the valley gave us that morning.</p></div>
+    <div class="card"><h3 class="serif">The River</h3><p>Waders, rods, and a guide who knows every pool by name.</p></div>
+  </section>
+
+  <section class="ask">
+    <div>
+      <h2 class="serif">Questions? Ask our concierge.</h2>
+      <p>Our concierge answers on video, day or night — availability, directions, the trout report. No account, no waiting on hold.</p>
+      <button class="link-btn" id="open-from-page">Open the video concierge →</button>
+    </div>
+  </section>
+</div>
+
+<!-- ===== Floating avatar widget ===== -->
+<button id="aw-launcher" aria-label="Talk to our concierge">
+  <svg viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="30" r="13" fill="#fff" opacity=".9"/><path d="M14 66c4-14 14-20 24-20s20 6 24 20z" fill="#fff" opacity=".9"/></svg>
+  <span class="dot"></span>
+</button>
+
+<div id="aw-panel" role="dialog" aria-label="Video concierge">
+  <div class="aw-head">
+    <div class="aw-face"></div>
+    <div><div class="aw-name">Concierge</div><div class="aw-sub">Online · answers on video</div></div>
+    <button class="aw-close" id="aw-close" aria-label="Close">×</button>
+  </div>
+  <div class="aw-stage">
+    <video id="aw-avatar" autoplay playsinline></video>
+    <video id="aw-self" autoplay playsinline muted></video>
+    <span class="aw-pill" id="aw-status">Live preview</span>
+  </div>
+  <div class="aw-body">
+    <div class="aw-idle">
+      <button class="aw-cta" id="aw-start">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M4 6h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm15 4 3-2v8l-3-2z"/></svg>
+        Start video call
+      </button>
+      <span class="aw-tag">Sponsored by Grand Valley Hotel</span>
+      <div class="aw-note">Free for guests · no sign-up needed</div>
+    </div>
+    <div class="aw-controls">
+      <button id="aw-mic">Mute mic</button>
+      <button id="aw-cam">Camera off</button>
+      <button id="aw-end" class="end">End</button>
+    </div>
+  </div>
+  <div id="aw-transcript"></div>
+  <div class="aw-foot">Powered by atmee.ai</div>
+</div>
+
+<script type="module">
+import { Room, RoomEvent, Track } from 'https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.esm.mjs';
+
+const $ = (id) => document.getElementById(id);
+const panel = $('aw-panel');
+const status = (t) => { $('aw-status').textContent = t; };
+let room, levelTimer;
+
+// Open / close the popover. Closing while live keeps the call running so
+// the visitor can keep browsing; End actually hangs up.
+const open = () => panel.classList.add('open');
+$('aw-launcher').onclick = () => panel.classList.toggle('open');
+$('open-from-page').onclick = open;
+$('aw-close').onclick = () => panel.classList.remove('open');
+
+$('aw-start').onclick = async () => {
+  $('aw-start').disabled = true;
+  status('Starting…');
+  try {
+    const res = await fetch('/api/session', { method: 'POST' });   // our own server holds the key
+    if (!res.ok) throw new Error('could not start session');
+    const { serverUrl, userToken } = await res.json();
+
+    room = new Room();
+    watchTranscript(room);
+    room.on(RoomEvent.TrackSubscribed, (track) => {
+      track.attach($('aw-avatar'));
+      if (track.kind === 'video') status('Live');
+    });
+    room.on(RoomEvent.LocalTrackPublished, (pub) => {
+      if (pub.track?.kind === 'video') { pub.track.attach($('aw-self')); $('aw-self').style.display = 'block'; }
+    });
+    room.on(RoomEvent.Disconnected, endCall);
+
+    status('Connecting…');
+    await room.connect(serverUrl, userToken);
+    await room.localParticipant.setMicrophoneEnabled(true, { noiseSuppression: true, echoCancellation: true });
+    await room.localParticipant.setCameraEnabled(true, { resolution: { width: 500, height: 500, aspectRatio: 1 } });
+
+    panel.classList.add('live');
+    levelTimer = setInterval(() => {
+      const mic = room?.localParticipant.getTrackPublication(Track.Source.Microphone);
+      const speaking = !mic?.isMuted && room.localParticipant.audioLevel > 0.01;
+      $('aw-status').classList.toggle('hearing', !!speaking);
+    }, 250);
+  } catch (err) {
+    console.error(err);
+    status('Could not start — try again');
+    $('aw-start').disabled = false;
+  }
+};
+
+$('aw-mic').onclick = async () => {
+  const on = room.localParticipant.isMicrophoneEnabled;
+  await room.localParticipant.setMicrophoneEnabled(!on);
+  $('aw-mic').textContent = on ? 'Unmute mic' : 'Mute mic';
+  $('aw-mic').classList.toggle('off', on);
+};
+$('aw-cam').onclick = async () => {
+  const on = room.localParticipant.isCameraEnabled;
+  await room.localParticipant.setCameraEnabled(!on);
+  $('aw-cam').textContent = on ? 'Camera on' : 'Camera off';
+  $('aw-cam').classList.toggle('off', on);
+  $('aw-self').style.display = on ? 'none' : 'block';
+};
+$('aw-end').onclick = () => room?.disconnect();
+
+function endCall() {
+  clearInterval(levelTimer);
+  panel.classList.remove('live');
+  $('aw-status').classList.remove('hearing');
+  status('Live preview');
+  $('aw-start').disabled = false;
+  $('aw-self').style.display = 'none';
+  $('aw-avatar').srcObject = null;
+}
+
+// Live transcript: both sides' speech arrives as LiveKit text streams on the
+// "lk.transcription" topic. Register before connect, once per room; chunks
+// are incremental per stream id, so accumulate by id for live captions.
+function watchTranscript(room) {
+  room.registerTextStreamHandler('lk.transcription', async (reader, participant) => {
+    const fromUser = participant.identity === room.localParticipant.identity;
+    let text = '';
+    for await (const chunk of reader) {
+      text += chunk;
+      renderTranscriptLine(reader.info.id, text, fromUser);
+    }
+  });
+}
+
+function renderTranscriptLine(id, text, fromUser) {
+  const panel = $('aw-transcript');
+  panel.style.display = 'flex';
+  let el = document.getElementById(`awt-${id}`);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = `awt-${id}`;
+    el.className = `line ${fromUser ? 'user' : 'avatar'}`;
+    panel.appendChild(el);
+    while (panel.children.length > 30) panel.removeChild(panel.firstChild);
+  }
+  el.textContent = text;
+  panel.scrollTop = panel.scrollHeight;
+}
+</script>

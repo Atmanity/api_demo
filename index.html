@@ -1,0 +1,224 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Atmee embed demo</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 16px; padding: 24px;
+    background: radial-gradient(1200px 600px at 50% -10%, #1f2937, #0b0f16);
+    color: #e5e7eb; font: 15px/1.5 system-ui, sans-serif;
+  }
+  h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: .02em; }
+  .stage {
+    position: relative; width: min(92vw, 640px); aspect-ratio: 1;
+    border-radius: 20px; overflow: hidden; background: #111827;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06);
+  }
+  #avatar { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #self {
+    position: absolute; right: 12px; bottom: 12px; width: 22%;
+    border-radius: 12px; border: 1px solid rgba(255,255,255,.15);
+    background: #0b0f16; display: none;
+  }
+  #status {
+    position: absolute; top: 12px; left: 12px; padding: 4px 10px;
+    border-radius: 999px; background: rgba(0,0,0,.55); font-size: 12.5px;
+    backdrop-filter: blur(4px);
+  }
+  /* Mic level: the pill glows green while your voice is being captured, so
+     "she can't hear me" is diagnosable at a glance. */
+  #status.hearing { background: rgba(16,185,129,.35); }
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  select {
+    padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15);
+    background: #1f2937; color: #e5e7eb; font: inherit; max-width: 260px;
+  }
+  button {
+    padding: 10px 18px; border-radius: 999px; border: 1px solid rgba(255,255,255,.15);
+    background: #1f2937; color: #e5e7eb; font: inherit; cursor: pointer;
+  }
+  button:hover { background: #263244; }
+  button.primary { background: #6366f1; border-color: transparent; }
+  button.primary:hover { background: #575ae8; }
+  button.off { background: #7f1d1d; }
+  .hidden { display: none !important; }
+  #transcript {
+    width: min(92vw, 640px); max-height: 180px; overflow-y: auto;
+    display: none; flex-direction: column; gap: 6px; padding: 12px 14px;
+    border-radius: 14px; background: rgba(17,24,39,.8);
+    box-shadow: 0 0 0 1px rgba(255,255,255,.06); font-size: 13.5px;
+  }
+  #transcript .line { max-width: 85%; padding: 6px 10px; border-radius: 10px; }
+  #transcript .avatar { align-self: flex-start; background: #1f2937; }
+  #transcript .user { align-self: flex-end; background: #3b4f82; }
+</style>
+
+<h1>Atmee embed demo</h1>
+<div class="stage">
+  <video id="avatar" autoplay playsinline></video>
+  <!-- muted: it's your own camera, you'd hear yourself otherwise -->
+  <video id="self" autoplay playsinline muted></video>
+  <span id="status">Ready</span>
+</div>
+<div id="transcript"></div>
+<div class="controls">
+  <button id="start" class="primary">Talk to the avatar</button>
+  <button id="mic" class="hidden">Mute mic</button>
+  <button id="cam" class="hidden">Camera off</button>
+  <button id="end" class="hidden">End</button>
+</div>
+<div class="controls">
+  <select id="micDevice" class="hidden" title="Microphone"></select>
+  <select id="camDevice" class="hidden" title="Camera"></select>
+</div>
+
+<script type="module">
+import { Room, RoomEvent, Track } from 'https://cdn.jsdelivr.net/npm/livekit-client/dist/livekit-client.esm.mjs';
+
+const $ = (id) => document.getElementById(id);
+const status = (text) => { $('status').textContent = text; };
+
+let room, levelTimer;
+
+$('start').onclick = async () => {
+  $('start').disabled = true;
+  status('Starting session…');
+  try {
+    const res = await fetch('/api/session', { method: 'POST' });   // our own server
+    if (!res.ok) throw new Error('could not start session');
+    const { serverUrl, userToken } = await res.json();
+
+    room = new Room();
+    watchTranscript(room);
+    room.on(RoomEvent.TrackSubscribed, (track) => {
+      // Avatar video and audio both attach to the same element; livekit
+      // merges them into its MediaStream.
+      track.attach($('avatar'));
+      if (track.kind === 'video') status('Live');
+    });
+    room.on(RoomEvent.LocalTrackPublished, (pub) => {
+      if (pub.track?.kind === 'video') {
+        pub.track.attach($('self'));
+        $('self').style.display = 'block';
+      }
+    });
+    room.on(RoomEvent.Disconnected, endCall);
+
+    status('Connecting…');
+    await room.connect(serverUrl, userToken);        // the avatar is already in there
+
+    // Same device settings the Atmee site uses. The camera is what lets
+    // avatars with vision react to your visitor -- drop the setCameraEnabled
+    // call for an audio-only embed.
+    await room.localParticipant.setMicrophoneEnabled(true, {
+      noiseSuppression: true,
+      echoCancellation: true,
+    });
+    await room.localParticipant.setCameraEnabled(true, {
+      resolution: { width: 500, height: 500, aspectRatio: 1 },
+    });
+
+    $('start').classList.add('hidden');
+    for (const id of ['mic', 'cam', 'end']) $(id).classList.remove('hidden');
+    await populateDevicePickers();
+
+    // Glow the status pill while the mic actually picks you up.
+    levelTimer = setInterval(() => {
+      const mic = room?.localParticipant.getTrackPublication(Track.Source.Microphone);
+      const speaking = (mic?.track?.currentBitrate ?? 0) > 0 && !mic?.isMuted &&
+        room.localParticipant.audioLevel > 0.01;
+      $('status').classList.toggle('hearing', !!speaking);
+    }, 250);
+  } catch (err) {
+    console.error(err);
+    status('Could not start — try again');
+    $('start').disabled = false;
+  }
+};
+
+$('mic').onclick = async () => {
+  const on = room.localParticipant.isMicrophoneEnabled;
+  await room.localParticipant.setMicrophoneEnabled(!on);
+  $('mic').textContent = on ? 'Unmute mic' : 'Mute mic';
+  $('mic').classList.toggle('off', on);
+};
+
+$('cam').onclick = async () => {
+  const on = room.localParticipant.isCameraEnabled;
+  await room.localParticipant.setCameraEnabled(!on);
+  $('cam').textContent = on ? 'Camera on' : 'Camera off';
+  $('cam').classList.toggle('off', on);
+  $('self').style.display = on ? 'none' : 'block';
+};
+
+$('end').onclick = () => room?.disconnect();
+
+// Device pickers: the browser's DEFAULT mic is often the worst one in the
+// room (laptop array instead of your headset), which buries speech in noise
+// and leaves the avatar unable to transcribe you.
+async function populateDevicePickers() {
+  const fill = async (kind, select) => {
+    const devices = await Room.getLocalDevices(kind, true);
+    select.innerHTML = '';
+    for (const d of devices) {
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;
+      opt.textContent = d.label || `${kind} ${select.length + 1}`;
+      select.appendChild(opt);
+    }
+    const active = room.getActiveDevice(kind);
+    if (active) select.value = active;
+    select.classList.remove('hidden');
+  };
+  await fill('audioinput', $('micDevice'));
+  await fill('videoinput', $('camDevice'));
+}
+
+$('micDevice').onchange = () => room.switchActiveDevice('audioinput', $('micDevice').value);
+$('camDevice').onchange = () => room.switchActiveDevice('videoinput', $('camDevice').value);
+
+// Live transcript: the avatar backend streams both sides' speech as LiveKit
+// text streams on the "lk.transcription" topic. Register the handler before
+// connect (a handler is bound when a stream opens, and the avatar starts
+// talking immediately), and register it exactly once per room. Chunks arrive
+// incrementally per stream id; partials for one utterance share the id, so
+// accumulating by id gives a live-updating line.
+function watchTranscript(room) {
+  const lines = new Map(); // stream id -> element
+  room.registerTextStreamHandler('lk.transcription', async (reader, participant) => {
+    const fromUser = participant.identity === room.localParticipant.identity;
+    let text = '';
+    for await (const chunk of reader) {
+      text += chunk;
+      renderLine(reader.info.id, text, fromUser);
+    }
+  });
+}
+
+function renderLine(id, text, fromUser) {
+  const panel = $('transcript');
+  panel.style.display = 'flex';
+  let el = document.getElementById(`t-${id}`);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = `t-${id}`;
+    el.className = `line ${fromUser ? 'user' : 'avatar'}`;
+    panel.appendChild(el);
+    while (panel.children.length > 40) panel.removeChild(panel.firstChild);
+  }
+  el.textContent = text;
+  panel.scrollTop = panel.scrollHeight;
+}
+
+function endCall() {
+  clearInterval(levelTimer);
+  status('Ended');
+  $('start').disabled = false;
+  $('start').classList.remove('hidden');
+  for (const id of ['mic', 'cam', 'end']) $(id).classList.add('hidden');
+  $('self').style.display = 'none';
+}
+</script>
