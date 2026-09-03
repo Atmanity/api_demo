@@ -173,14 +173,22 @@ console.log(`Created ${created.avatarId} - status: ${created.status}`);
 // --- Poll until the build finishes -------------------------------------------
 
 const statusUrl = `${API_BASE_URL}${created.statusUrl}`;
+let transientFailures = 0;
 for (;;) {
   await new Promise((resolve) => setTimeout(resolve, 3000));
   const res = await fetch(statusUrl, { headers: { 'X-Api-Key': API_KEY } });
   const status = await readJson(res);
   if (!res.ok) {
+    // A 5xx from the load balancer (a rollout, a blip) is worth a retry;
+    // anything else (401, 404) is a real answer.
+    if (res.status >= 500 && ++transientFailures <= 5) {
+      console.warn(`Status check got ${res.status}, retrying (${transientFailures}/5)`);
+      continue;
+    }
     console.error(`Status check failed (${res.status}):`, status);
     process.exit(1);
   }
+  transientFailures = 0;
   const stages = Object.entries(status.stages)
     .map(([stage, s]) => `${stage}=${s.status}`)
     .join(' ');

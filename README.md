@@ -96,6 +96,25 @@ manifest to start from (copy it, change the name and persona). Add
 `knowledge.descriptions` block in the manifest maps those filenames to short
 descriptions.
 
+### Or from URLs, without a zip
+
+If the files already sit on a public https host, `create-avatar-from-urls.mjs`
+sends the manifest as JSON with an `assets` block and Atmee downloads them:
+
+```bash
+ATMEE_API_KEY=sk_atmee_… node create-avatar-from-urls.mjs \
+  --image https://cdn.example.com/portrait.jpg \
+  --voice https://cdn.example.com/sample.wav \
+  --knowledge https://cdn.example.com/faq.md
+```
+
+Private or non-https hosts are refused (`invalid_url`); a URL that cannot be
+downloaded fails the create with `fetch_failed`. Add `"previews": true` to the
+manifest if you want the idle/talking preview clips rendered too — the API
+returns them as one-hour `previewUrls` on the status response once done.
+Sessions started with `POST /v1/session` can pass `"language": "ja"` (or `en`,
+`zh-TW`) to run in the visitor's language.
+
 ### Or by hand, with zip and curl
 
 The script is just a convenience — the API takes an ordinary zip. Lay the
